@@ -1,0 +1,5 @@
+*.[do]
+/main
+/mesh.msh
+/*.dat
+/*.gif

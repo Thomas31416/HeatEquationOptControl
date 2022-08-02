@@ -1,0 +1,177 @@
+border b1(t=0,1){x = t;    y = 0;   }
+border b2(t=0,1){x = 1;   y = t;   }
+border b3(t=0,1){x = 1-t; y = 1;  }
+border b4(t=0,1){x = 0;    y = 1-t;}
+
+border b5(t=0,0.2){x = 0.4;   y = 0.4+t;}
+border b6(t=0,0.2){x = 0.4+t; y = 0.6;  }
+border b7(t=0,0.2){x = 0.6;   y = 0.6-t;}
+border b8(t=0,0.2){x = 0.6-t; y = 0.4;  }
+
+border b9(t=0,0.2){x = 1.0-t; y = 0.8;  }
+border b10(t=0,0.2){x = 0.8;   y = 0.8+t;}
+
+border b11(t=0,0.2){x = 0.2;   y = 1.0-t;}
+border b12(t=0,0.2){x = 0.2-t; y = 0.8;  }
+
+border b13(t=0,0.2){x = 0.0+t; y = 0.2;  }
+border b14(t=0,0.2){x = 0.2;   y = 0.2-t;}
+
+border b15(t=0,0.2){x = 0.8;   y = 0.0+t;}
+border b16(t=0,0.2){x = 0.8+t; y = 0.2;  }
+
+int nn = 15;
+int mm = 3;
+
+mesh Th = buildmesh(b1(nn)+b2(nn)+b3(nn)+b4(nn)
+                     +b5(-mm)+b6(-mm)+b7(-mm)+b8(-mm)
+                     +b9(-mm)+b10(-mm)
+                     +b11(-mm)+b12(-mm)
+                     +b13(-mm)+b14(-mm)
+                     +b15(mm)+b16(mm));
+
+int n = ceil(sqrt(Th.nt));
+real T = 1.0;
+real dt = T / n;
+
+real alpha = 0.00001;
+
+fespace Vh(Th, P1);
+fespace Vh0(Th, P0);
+
+Vh0 Ic = (region==2) + (region==4) + (region==6) + (region==8) + (region==14);
+
+macro extract(uk, u, k) for (int i = 0; i < Vh.ndof; ++i) uk[][i] = u[k * Vh.ndof + i];//
+macro update(u, k, uk) for (int i = 0; i < Vh.ndof; ++i) u[k * Vh.ndof + i] = uk[][i];//
+
+macro grad(u) [dx(u),dy(u)]//
+
+func real[int] Heat(real[int] &u){
+    real[int] y((n + 1) * Vh.ndof);
+    Vh y0 = 0.0, y1, z, uk;
+
+    problem HeatStep(y1, z) = int2d(Th)(y1*z/dt)
+                            + int2d(Th)(grad(y1)'*grad(z))
+                            - int2d(Th)(y0*z/dt)
+                            - int2d(Th)(Ic*uk*z)
+                            + on(1, 2, 3, 4, y1=0);
+
+    for (int k = 0; true; ++k) {
+        update(y, k, y0);
+
+        if (k >= n)
+            break;
+
+        extract(uk, u, k);
+        HeatStep;
+        y0 = y1;
+    }
+
+    return y;
+}
+
+func real[int] HeatAdj(real[int] &y){
+    real[int] u((n + 1) * Vh.ndof);
+    Vh u0 = 0.0, u1, v, Icu0, yk;
+
+    problem HeatAdjStep(u1, v) = int2d(Th)(u1*v/dt)
+                               + int2d(Th)(grad(u1)'*grad(v))
+                               - int2d(Th)(u0*v/dt)
+                               - int2d(Th)(yk*v)
+                               + on(1, 2, 3, 4, u1=0);
+
+    for (int k = n; true; --k) {
+        Icu0 = Ic * u0;
+        update(u, k, Icu0);
+
+        if (k == 0)
+            break;
+
+        extract(yk, y, k);
+        HeatAdjStep;
+        u0 = u1;
+    }
+
+    return u;
+}
+
+func real[int] IntTimeCtrl(real[int] &u) {
+    real[int] v((n + 1) * Vh.ndof);
+    Vh uk, vk;
+
+    for (int k = 0; k < n + 1; ++k) {
+        extract(uk, u, k);
+
+        for (int i = 0; i < Vh.ndof; ++i) {
+            Vh phi = 0.0;
+            phi[][i] = 1.0;
+            vk[][i] = 1.0 / (n + 1) * int2d(Th)(Ic*uk*phi);
+        }
+
+        update(v, k, vk);
+    }
+
+    return v;
+}
+
+func real[int] DJ(real[int] &u) {
+    real[int] v((n + 1) * Vh.ndof);
+    v = HeatAdj(Heat(u));
+    v += alpha * u;
+    return IntTimeCtrl(v);
+}
+
+real[int] y((n + 1) * Vh.ndof), b((n + 1) * Vh.ndof), u((n + 1) * Vh.ndof);
+y = 1.0;
+b = IntTimeCtrl(HeatAdj(y));
+u = 0.0;
+LinearCG(DJ, u, b, eps=1.0e-4, nbiter=1000, verbosity=5);
+
+{
+    ofstream ff("control-ff++.dat");
+    Vh uk;
+
+    for (int k = 0; k < n + 1; ++k) {
+        extract(uk, u, k);
+
+        for (int i = 0; i < Th.nt; ++i) {
+            if (Th[i].region == 2 ||
+                Th[i].region == 4 ||
+                Th[i].region == 6 ||
+                Th[i].region == 8 ||
+                Th[i].region == 14)
+            {
+                for (int j = 0; j < 4; ++j) {
+                    ff << k << " "
+                       << Th[i][j % 3].x << " "
+                       << Th[i][j % 3].y << " "
+                       << uk[][Vh(i, j % 3)] << endl;
+                }
+
+                ff << endl << endl;
+            }
+        }
+    }
+}
+
+y = Heat(u);
+
+{
+    ofstream ff("heat-ff++.dat");
+    Vh yk;
+
+    for (int k = 0; k < n + 1; ++k) {
+        extract(yk, y, k);
+
+        for (int i = 0; i < Th.nt; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                ff << k << " "
+                   << Th[i][j % 3].x << " "
+                   << Th[i][j % 3].y << " "
+                   << yk[][Vh(i, j % 3)] << endl;
+            }
+
+            ff << endl << endl;
+        }
+    }
+}

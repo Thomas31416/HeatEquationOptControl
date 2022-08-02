@@ -1,0 +1,26 @@
+# Contrôle optimal de l'équation de la chaleur
+
+Pour générer le maillage et construire le programme, utiliser la commande :
+
+    $ make
+
+La variable `BLAS_LIBS` devra peut-être être modifiée dans le Makefile.
+
+Pour résoudre le problème et générer les graphes du contrôle optimal et de
+l'équation de la chaleur associée :
+
+    $ make plot-c++
+
+Pour résoudre le problème avec FreeFem++ et générer les graphes :
+
+    $ make plot-ff++
+
+Pour calculer la différence entre les solutions données par le code C++ et
+FreeFem++ et générer les graphes correspondants :
+
+    $ make plot-err
+
+Les graphes seront animés pour afficher la solution en tout temps et seront donc
+enregistrés dans des fichiers `.gif`.
+
+Python 3 est nécessaire pour le calcul de l'erreur.

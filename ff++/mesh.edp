@@ -1,0 +1,33 @@
+border b1(t=0,1){x = t;    y = 0;   }
+border b2(t=0,1){x = 1;   y = t;   }
+border b3(t=0,1){x = 1-t; y = 1;  }
+border b4(t=0,1){x = 0;    y = 1-t;}
+
+border b5(t=0,0.2){x = 0.4;   y = 0.4+t;}
+border b6(t=0,0.2){x = 0.4+t; y = 0.6;  }
+border b7(t=0,0.2){x = 0.6;   y = 0.6-t;}
+border b8(t=0,0.2){x = 0.6-t; y = 0.4;  }
+
+border b9(t=0,0.2){x = 1.0-t; y = 0.8;  }
+border b10(t=0,0.2){x = 0.8;   y = 0.8+t;}
+
+border b11(t=0,0.2){x = 0.2;   y = 1.0-t;}
+border b12(t=0,0.2){x = 0.2-t; y = 0.8;  }
+
+border b13(t=0,0.2){x = 0.0+t; y = 0.2;  }
+border b14(t=0,0.2){x = 0.2;   y = 0.2-t;}
+
+border b15(t=0,0.2){x = 0.8;   y = 0.0+t;}
+border b16(t=0,0.2){x = 0.8+t; y = 0.2;  }
+
+int nn = 15;
+int mm = 3;
+
+mesh Th = buildmesh(b1(nn)+b2(nn)+b3(nn)+b4(nn)
+                     +b5(-mm)+b6(-mm)+b7(-mm)+b8(-mm)
+                     +b9(-mm)+b10(-mm)
+                     +b11(-mm)+b12(-mm)
+                     +b13(-mm)+b14(-mm)
+                     +b15(mm)+b16(mm));
+
+savemesh(Th, "mesh.msh");
